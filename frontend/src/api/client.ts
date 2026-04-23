@@ -1,6 +1,13 @@
 import type { DashboardStats, ExchangeRate, MnoAccount, MnoTransaction, MnoWallet, Role, Session, User } from './types';
 
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8080/api';
+declare global {
+  interface Window {
+    __APP_CONFIG__?: { VITE_API_URL?: string };
+  }
+}
+
+const runtimeApiUrl = window.__APP_CONFIG__?.VITE_API_URL;
+const API_URL = runtimeApiUrl && runtimeApiUrl !== '${VITE_API_URL}' ? runtimeApiUrl : (import.meta.env.VITE_API_URL ?? 'http://localhost:8080/api');
 let token = localStorage.getItem('mobi_token') ?? '';
 export function setToken(next: string) { token = next; next ? localStorage.setItem('mobi_token', next) : localStorage.removeItem('mobi_token'); }
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
