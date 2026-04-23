@@ -1,0 +1,10 @@
+export type Role = 'ADMIN' | 'MOBI_AGENT';
+export type TransactionType = 'DEPOSIT' | 'WITHDRAWAL';
+export type TransactionStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+export type User = { id: number; name: string; email: string; role: Role };
+export type Session = User & { token: string; userId: number };
+export type MnoAccount = { id?: number; userId?: number; name: string; country: string; mobileNumber: string; emoneyAmount: number; network: string; cashAtHand: number; accountType: string };
+export type MnoWallet = { id?: number; userId?: number; agentId: number; name: string; network: string; balance: number };
+export type MnoTransaction = { id: number; walletId: number; mnoWalletName: string; agentNumber: string; transactionType: TransactionType; amount: number; previousBalance: number; balance: number; date: string; clientPhone: string; clientName: string; status: TransactionStatus };
+export type ExchangeRate = { id?: number; fromCurrency: string; toCurrency: string; rate: number; updatedAt?: string };
+export type DashboardStats = { accountCount: number; walletCount: number; transactionCount: number; totalEmoney: number; totalCashAtHand: number; totalWalletBalance: number };
