@@ -35,6 +35,8 @@ class TransactionService {
         if (!wallet.getUserId().equals(userId)) throw new IllegalArgumentException("Wallet not found");
         if (request.amount() == null || request.amount().signum() <= 0) throw new IllegalArgumentException("Amount must be positive");
 
+        // The DOCX sequence requires previous balance, new balance, and wallet update to stay together.
+        // This method is transactional so the transaction record and wallet balance are committed as one unit.
         BigDecimal previous = wallet.getBalance();
         BigDecimal next = switch (request.transactionType()) {
             case DEPOSIT -> previous.add(request.amount());
@@ -49,6 +51,7 @@ class TransactionService {
         tx = transactions.save(tx);
         tx.setStatus(TransactionStatus.PROCESSING);
         try {
+            // The adapter is a placeholder for a future real MNO API call.
             var result = provider.recordTransaction(tx);
             if (!result.successful()) throw new IllegalStateException(result.message());
             wallet.setBalance(next); wallets.save(wallet); tx.setStatus(TransactionStatus.COMPLETED); tx.setBalance(next);

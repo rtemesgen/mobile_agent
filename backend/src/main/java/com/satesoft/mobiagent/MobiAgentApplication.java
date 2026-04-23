@@ -18,6 +18,8 @@ public class MobiAgentApplication {
     @Bean
     CommandLineRunner seedUsers(UserRepository users, AuthService authService) {
         return args -> {
+            // Demo users are created only for an empty database so the app can be tested immediately.
+            // In production, real users can register or be managed by an admin.
             if (users.count() == 0) {
                 users.save(new User("Admin User", "admin@mobi.local", authService.hashPassword("admin123"), Role.ADMIN));
                 users.save(new User("Mobi Agent", "agent@mobi.local", authService.hashPassword("agent123"), Role.MOBI_AGENT));

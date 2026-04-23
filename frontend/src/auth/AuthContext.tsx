@@ -11,6 +11,7 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(() => {
+    // Persisting the session lets the user refresh the page without logging in again.
     const raw = localStorage.getItem('mobi_session');
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Session;

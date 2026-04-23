@@ -69,12 +69,16 @@ gcloud sql databases create mobi_agent --instance=mobi-agent-db
 Set the PostgreSQL password:
 
 ```bash
-gcloud sql users set-password postgres \
-  --instance=mobi-agent-db \
-  --password=Mobileagent123
+DB_PASSWORD=replace-with-a-strong-password
 ```
 
-You can use a different password, but if you do, use the same password in the backend deployment command.
+```bash
+gcloud sql users set-password postgres \
+  --instance=mobi-agent-db \
+  --password=$DB_PASSWORD
+```
+
+Set the password variable first, then use the same value in the backend deployment command.
 
 ## 5. Prepare Cloud SQL Permissions
 
@@ -126,7 +130,7 @@ gcloud run deploy mobi-agent-api \
   --region=$REGION \
   --allow-unauthenticated \
   --add-cloudsql-instances=$CONNECTION_NAME \
-  --set-env-vars="DB_URL=jdbc:postgresql:///mobi_agent?cloudSqlInstance=$CONNECTION_NAME&socketFactory=com.google.cloud.sql.postgres.SocketFactory,DB_USERNAME=postgres,DB_PASSWORD=Mobileagent123,JWT_SECRET=change-this-to-a-long-secret-value,CORS_ALLOWED_ORIGIN=https://temporary-url.com,SPRING_JPA_DATABASE_PLATFORM=org.hibernate.dialect.PostgreSQLDialect"
+  --set-env-vars="DB_URL=jdbc:postgresql:///mobi_agent?cloudSqlInstance=$CONNECTION_NAME&socketFactory=com.google.cloud.sql.postgres.SocketFactory,DB_USERNAME=postgres,DB_PASSWORD=$DB_PASSWORD,JWT_SECRET=change-this-to-a-long-secret-value,CORS_ALLOWED_ORIGIN=https://temporary-url.com,SPRING_JPA_DATABASE_PLATFORM=org.hibernate.dialect.PostgreSQLDialect"
 ```
 
 Save the backend URL:

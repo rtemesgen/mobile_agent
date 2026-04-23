@@ -34,6 +34,8 @@ import java.util.List;
 public class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http, JwtAuthFilter jwtAuthFilter) throws Exception {
+        // The API is stateless: every protected request must send a JWT in the Authorization header.
+        // Admin-only endpoints are limited here, while Mobi Agent users can access the feature endpoints.
         return http.csrf(csrf -> csrf.disable()).cors(cors -> {}).sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth.requestMatchers("/api/auth/login", "/api/auth/register").permitAll().requestMatchers("/api/users/**").hasRole("ADMIN").anyRequest().hasAnyRole("ADMIN", "MOBI_AGENT"))
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class).build();
@@ -42,6 +44,7 @@ public class SecurityConfig {
     @Bean PasswordEncoder passwordEncoder() { return new BCryptPasswordEncoder(); }
 
     @Bean CorsConfigurationSource corsConfigurationSource(@Value("${app.cors.allowed-origin}") String origin) {
+        // Cloud Run frontend and local Vite frontend use different origins, so this value is configured by env var.
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(List.of(origin)); config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")); config.setAllowedHeaders(List.of("*"));
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource(); source.registerCorsConfiguration("/**", config); return source;
@@ -55,6 +58,7 @@ public class SecurityConfig {
         @Override protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain) throws ServletException, IOException {
             String header = request.getHeader(HttpHeaders.AUTHORIZATION);
             if (header != null && header.startsWith("Bearer ")) {
+                // Parse the token, find the current user, and attach their role to Spring Security.
                 Claims claims = jwtService.parse(header.substring(7));
                 users.findByEmail(claims.getSubject()).ifPresent(user -> {
                     var authorities = List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()));

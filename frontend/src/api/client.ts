@@ -6,11 +6,14 @@ declare global {
   }
 }
 
+// Cloud Run writes /env.js at container startup so the same frontend image can point to any backend URL.
+// Local development still falls back to Vite env vars or http://localhost:8080/api.
 const runtimeApiUrl = window.__APP_CONFIG__?.VITE_API_URL;
 const API_URL = runtimeApiUrl && runtimeApiUrl !== '${VITE_API_URL}' ? runtimeApiUrl : (import.meta.env.VITE_API_URL ?? 'http://localhost:8080/api');
 let token = localStorage.getItem('mobi_token') ?? '';
 export function setToken(next: string) { token = next; next ? localStorage.setItem('mobi_token', next) : localStorage.removeItem('mobi_token'); }
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  // Every protected backend call uses the JWT saved after login/register.
   const res = await fetch(`${API_URL}${path}`, { ...options, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(options.headers ?? {}) } });
   if (!res.ok) throw new Error(await res.text() || res.statusText);
   if (res.status === 204) return undefined as T;
