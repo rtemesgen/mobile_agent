@@ -25,6 +25,68 @@ frontend/   React + TypeScript Vite app
 settings.gradle
 ```
 
+
+## Fresh Clone Setup
+
+After cloning the repository, install and run the two app parts separately.
+
+```powershell
+git clone https://github.com/rtemesgen/mobile_agent.git
+cd mobile_agent
+```
+
+Start the backend with the local H2 demo database:
+
+```powershell
+$env:SPRING_PROFILES_ACTIVE="dev"
+gradle :backend:bootRun
+```
+
+Keep that terminal open. In a second terminal, start the frontend:
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+Open:
+
+```text
+http://localhost:5173
+```
+
+If port `8080` is already in use, stop the old Java backend process or run the backend on another port:
+
+```powershell
+$env:PORT="8081"
+$env:SPRING_PROFILES_ACTIVE="dev"
+gradle :backend:bootRun
+```
+
+If you change the backend port, update `frontend/.env`:
+
+```text
+VITE_API_URL=http://localhost:8081/api
+```
+
+## Deploy After Cloning
+
+For Google Cloud deployment, follow the full guide here:
+
+```text
+GOOGLE_CLOUD_DEPLOYMENT.md
+```
+
+Short version:
+
+1. Clone the repo in Google Cloud Shell.
+2. Create Cloud SQL PostgreSQL.
+3. Deploy backend with `gcloud run deploy mobi-agent-api --source backend`.
+4. Save the backend URL.
+5. Deploy frontend with `gcloud run deploy mobi-agent-web --source frontend`.
+6. Set frontend `VITE_API_URL` to the backend URL ending in `/api`.
+7. Update backend `CORS_ALLOWED_ORIGIN` to the frontend URL.
 ## Seed Users
 
 The backend creates these users automatically when the database is empty:

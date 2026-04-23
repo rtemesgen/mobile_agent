@@ -1,30 +1,16 @@
 # Google Cloud Deployment Guide
 
-This guide explains how to deploy the Mobi Agent app on Google Cloud.
+This guide shows how to deploy the Mobi Agent project after cloning the GitHub repository.
 
-Recommended setup:
+The app is deployed as:
 
-- Backend: Cloud Run
-- Database: Cloud SQL for PostgreSQL
-- Frontend: Cloud Run
+- Backend: Spring Boot API on Cloud Run
+- Database: Cloud SQL PostgreSQL
+- Frontend: React app on Cloud Run
 
-Cloud Run is used because it can run the Spring Boot backend and the built React frontend as containers.
+## 1. Open Cloud Shell
 
-## 1. Requirements
-
-You need:
-
-- A Google Cloud account
-- Billing enabled on the Google Cloud project
-- Google Cloud CLI installed, or use Google Cloud Shell in the browser
-- Access to the GitHub repository
-
-Check that you are logged in:
-
-```bash
-gcloud auth login
-gcloud config list
-```
+Go to Google Cloud Console and open Cloud Shell.
 
 Set your project:
 
@@ -32,153 +18,242 @@ Set your project:
 gcloud config set project YOUR_PROJECT_ID
 ```
 
-Choose a region. Example:
+Set the region:
 
 ```bash
 REGION=us-central1
 ```
 
-On PowerShell, use:
+## 2. Clone The Repository
 
-```powershell
-$REGION="us-central1"
+```bash
+git clone https://github.com/rtemesgen/mobile_agent.git
+cd mobile_agent
 ```
 
-## 2. Enable Google Cloud Services
+If you already cloned it before:
 
-Run:
+```bash
+cd ~/mobile_agent
+git pull
+```
+
+## 3. Enable Required Services
 
 ```bash
 gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com sqladmin.googleapis.com
 ```
 
-## 3. Create PostgreSQL Database On Cloud SQL
+## 4. Create Cloud SQL PostgreSQL
 
-Create a PostgreSQL instance:
+Create the database server:
 
 ```bash
 gcloud sql instances create mobi-agent-db \
   --database-version=POSTGRES_16 \
+  --edition=ENTERPRISE \
   --tier=db-f1-micro \
-  --region=$REGION
+  --region=$REGION \
+  --storage-type=HDD \
+  --storage-size=10GB \
+  --availability-type=ZONAL \
+  --no-deletion-protection
 ```
 
-Create the database:
+Create the app database:
 
 ```bash
 gcloud sql databases create mobi_agent --instance=mobi-agent-db
 ```
 
-Set the postgres user password:
+Set the PostgreSQL password:
 
 ```bash
 gcloud sql users set-password postgres \
   --instance=mobi-agent-db \
-  --password=YOUR_STRONG_PASSWORD
+  --password=Mobileagent123
 ```
 
-Get the Cloud SQL connection name:
+You can use a different password, but if you do, use the same password in the backend deployment command.
+
+## 5. Prepare Cloud SQL Permissions
+
+Get your project number:
 
 ```bash
-gcloud sql instances describe mobi-agent-db --format="value(connectionName)"
+PROJECT_ID=$(gcloud config get-value project)
+PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format="value(projectNumber)")
+echo $PROJECT_ID
+echo $PROJECT_NUMBER
 ```
 
-Save the output. It looks like:
+Give the Cloud Run runtime service account permission to connect to Cloud SQL:
+
+```bash
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+  --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
+  --role="roles/cloudsql.client"
+```
+
+If Google asks for an IAM condition, choose:
 
 ```text
-project-id:region:mobi-agent-db
+2
 ```
 
-## 4. Deploy The Backend To Cloud Run
+That means `None`.
 
-From the project root, run:
+## 6. Get The Cloud SQL Connection Name
+
+```bash
+CONNECTION_NAME=$(gcloud sql instances describe mobi-agent-db --format="value(connectionName)")
+echo $CONNECTION_NAME
+```
+
+It should look like:
+
+```text
+project-id:us-central1:mobi-agent-db
+```
+
+## 7. Deploy The Backend
+
+Run this from the repository root:
 
 ```bash
 gcloud run deploy mobi-agent-api \
   --source backend \
   --region=$REGION \
   --allow-unauthenticated \
-  --add-cloudsql-instances=YOUR_CONNECTION_NAME \
-  --set-env-vars="DB_URL=jdbc:postgresql://google/mobi_agent?cloudSqlInstance=YOUR_CONNECTION_NAME&socketFactory=com.google.cloud.sql.postgres.SocketFactory,DB_USERNAME=postgres,DB_PASSWORD=YOUR_STRONG_PASSWORD,JWT_SECRET=CHANGE_THIS_TO_A_LONG_SECRET,CORS_ALLOWED_ORIGIN=https://TEMP_FRONTEND_URL"
+  --add-cloudsql-instances=$CONNECTION_NAME \
+  --set-env-vars="DB_URL=jdbc:postgresql:///mobi_agent?cloudSqlInstance=$CONNECTION_NAME&socketFactory=com.google.cloud.sql.postgres.SocketFactory,DB_USERNAME=postgres,DB_PASSWORD=Mobileagent123,JWT_SECRET=change-this-to-a-long-secret-value,CORS_ALLOWED_ORIGIN=https://temporary-url.com,SPRING_JPA_DATABASE_PLATFORM=org.hibernate.dialect.PostgreSQLDialect"
 ```
 
-Important: the frontend URL is not known yet. Use a temporary value first. After deploying the frontend, update `CORS_ALLOWED_ORIGIN` with the real frontend URL.
+Save the backend URL:
 
-After deployment, copy the backend service URL. It will look like:
-
-```text
-https://mobi-agent-api-xxxxx.a.run.app
+```bash
+BACKEND_URL=$(gcloud run services describe mobi-agent-api \
+  --region=$REGION \
+  --format="value(status.url)")
+echo $BACKEND_URL
 ```
 
-## 5. Deploy The Frontend To Cloud Run
+Test backend login:
 
-From the project root, run:
+```bash
+curl $BACKEND_URL/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"agent@mobi.local","password":"agent123"}'
+```
+
+If it returns a token, the backend works.
+
+## 8. Deploy The Frontend
+
+Run this from the repository root:
 
 ```bash
 gcloud run deploy mobi-agent-web \
   --source frontend \
   --region=$REGION \
   --allow-unauthenticated \
-  --set-build-env-vars="VITE_API_URL=https://YOUR_BACKEND_URL/api"
+  --set-env-vars="VITE_API_URL=$BACKEND_URL/api"
 ```
 
-After deployment, copy the frontend URL. It will look like:
+Save the frontend URL:
 
-```text
-https://mobi-agent-web-xxxxx.a.run.app
+```bash
+FRONTEND_URL=$(gcloud run services describe mobi-agent-web \
+  --region=$REGION \
+  --format="value(status.url)")
+echo $FRONTEND_URL
 ```
 
-## 6. Update Backend CORS
+Check that the frontend has the correct backend URL:
 
-Now update the backend so it accepts requests from the frontend:
+```bash
+curl $FRONTEND_URL/env.js
+```
+
+It should show the backend API URL.
+
+## 9. Update Backend CORS
+
+The backend must allow requests from the frontend URL:
 
 ```bash
 gcloud run services update mobi-agent-api \
   --region=$REGION \
-  --set-env-vars="CORS_ALLOWED_ORIGIN=https://YOUR_FRONTEND_URL"
+  --update-env-vars="CORS_ALLOWED_ORIGIN=$FRONTEND_URL"
 ```
 
-If this command replaces other environment variables in your setup, update all backend variables together from the Cloud Run console instead.
+## 10. Open The Live App
 
-## 7. Test The Live App
+Open the frontend URL in your browser:
 
-Open the frontend URL in your browser.
+```bash
+echo $FRONTEND_URL
+```
 
-Use one of the seeded demo accounts:
+Login with:
 
 ```text
-Admin: admin@mobi.local / admin123
 Mobi Agent: agent@mobi.local / agent123
+Admin: admin@mobi.local / admin123
 ```
 
 You can also register a new user from the login page.
 
-## 8. Common Problems
+## 11. If Login Fails
 
-### Backend says database connection failed
+First test backend directly:
 
-Check:
+```bash
+curl $BACKEND_URL/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"agent@mobi.local","password":"agent123"}'
+```
 
-- Cloud SQL instance is running
-- `DB_URL` uses the correct connection name
-- `DB_PASSWORD` is correct
-- Cloud Run service has the Cloud SQL instance attached
+Then check frontend runtime config:
 
-### Frontend cannot login
+```bash
+curl $FRONTEND_URL/env.js
+```
 
-Check:
+If `/env.js` does not show the backend URL, redeploy the frontend with:
 
-- `VITE_API_URL` was set to the backend URL ending with `/api`
-- Backend `CORS_ALLOWED_ORIGIN` is set to the frontend URL
-- Backend service is running
+```bash
+gcloud run deploy mobi-agent-web \
+  --source frontend \
+  --region=$REGION \
+  --allow-unauthenticated \
+  --set-env-vars="VITE_API_URL=$BACKEND_URL/api"
+```
 
-### Port problems
+If the browser still fails, hard refresh with `Ctrl + F5` or use an incognito window.
 
-Cloud Run expects apps to listen on the port in the `PORT` variable. This project already supports that in the backend and the frontend nginx container listens on port `8080`.
+## 12. Useful Commands
 
-## 9. Useful Google Cloud Console Pages
+View backend logs:
 
-- Cloud Run: check deployed backend and frontend services
-- Cloud SQL: check PostgreSQL database
-- Cloud Build: check build logs if deployment fails
-- Artifact Registry: stores built container images
+```bash
+gcloud run services logs read mobi-agent-api --region=$REGION --limit=80
+```
+
+View frontend logs:
+
+```bash
+gcloud run services logs read mobi-agent-web --region=$REGION --limit=80
+```
+
+List Cloud Run services:
+
+```bash
+gcloud run services list --region=$REGION
+```
+
+List Cloud SQL databases:
+
+```bash
+gcloud sql databases list --instance=mobi-agent-db
+```

@@ -34,3 +34,13 @@ Thumbs.db
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+# Android APK project
+mobile-apk/.gradle/
+mobile-apk/build/
+mobile-apk/app/build/
+mobile-apk/local.properties
+*.apk
+*.aab
+
+# Assignment source document
+Mobi_Agent_UML_Documentation.docx
