@@ -44,3 +44,6 @@ mobile-apk/local.properties
 
 # Assignment source document
 Mobi_Agent_UML_Documentation.docx
+
+# Private personal notes
+CODE_STRUCTURE_NOTES.md

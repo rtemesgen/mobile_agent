@@ -22,7 +22,7 @@ class MnoTransactionController {
     private User currentUser(Authentication auth) { return users.findByEmail(auth.getName()).orElseThrow(); }
 }
 
-record TransactionRequest(Long walletId, TransactionType transactionType, BigDecimal amount, String agentNumber, String clientPhone, String clientName) {}
+record TransactionRequest(Long walletId, TransactionType transactionType, BigDecimal amount, String agentNumber, String clientPhone, String clientId, String clientName) {}
 
 @Service
 class TransactionService {
@@ -47,7 +47,7 @@ class TransactionService {
         MnoTransaction tx = new MnoTransaction();
         tx.setUserId(userId); tx.setWalletId(wallet.getId()); tx.setMnoWalletName(wallet.getName()); tx.setAgentNumber(request.agentNumber());
         tx.setTransactionType(request.transactionType()); tx.setAmount(request.amount()); tx.setPreviousBalance(previous); tx.setBalance(next);
-        tx.setDate(Instant.now()); tx.setClientPhone(request.clientPhone()); tx.setClientName(request.clientName()); tx.setStatus(TransactionStatus.PENDING);
+        tx.setDate(Instant.now()); tx.setClientPhone(request.clientPhone()); tx.setClientId(request.clientId()); tx.setClientName(request.clientName() != null && !request.clientName().isBlank() ? request.clientName() : request.clientId()); tx.setStatus(TransactionStatus.PENDING);
         tx = transactions.save(tx);
         tx.setStatus(TransactionStatus.PROCESSING);
         try {
